@@ -1,0 +1,268 @@
+﻿<Window
+    x:Class="RealTimeMonitor.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:RealTimeMonitor"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="[vm ]clr-namespace:RealTimeMonitor.ViewModel"
+    Title="MainWindow"
+    Width="1100"
+    Height="550"
+    Closing="Window_Closing"
+    WindowStartupLocation="CenterScreen"
+    mc:Ignorable="d">
+
+    <Window.Resources>
+        <!--  按钮样式  -->
+        <Style
+            x:Key="ActionButtonStyle"
+            BasedOn="{StaticResource {x:Type Button}}"
+            TargetType="Button">
+            <Setter Property="Margin" Value="3" />
+            <Setter Property="Padding" Value="5,2" />
+            <Setter Property="MinWidth" Value="70" />
+
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Margin" Value="5" />
+            <Setter Property="Padding" Value="5,2" />
+            <Setter Property="MinWidth" Value="70" />
+        </Style>
+        <!--  布尔值反转转换器  -->
+        <local:BoolInverterConverter x:Key="BoolInverter" />
+
+    </Window.Resources>
+
+    <DockPanel Margin="10">
+        <!--  顶部工具栏  -->
+        <StackPanel
+            Margin="0,0,0,10"
+            HorizontalAlignment="Left"
+            DockPanel.Dock="Top"
+            Orientation="Horizontal">
+            <TextBox
+                Width="170"
+                Height="30"
+                Margin="0,0,10,0"
+                Text="{Binding FindName}" />
+            <ComboBox
+                Width="190"
+                Height="30"
+                ItemsSource="{Binding VariableNames}"
+                SelectedItem="{Binding FindName}" />
+            <TextBlock
+                Width="100"
+                Height="25"
+                Margin="10,0,0,0"
+                Padding="0,4,0,0"
+                VerticalAlignment="Center"
+                Background="#FF4CAF50"
+                Foreground="White"
+                Text="{Binding FileName}"
+                TextAlignment="Center" />
+            <Button
+                Background="#FF4CAF50"
+                Command="{Binding GetVariableItems}"
+                Content="导入Map文件"
+                Foreground="White" />
+            <Button
+                Background="#FF4CAF50"
+                Command="{Binding GetVariablePath}"
+                Content="查找变量"
+                Foreground="White" />
+            <ComboBox
+                Width="60"
+                Height="30"
+                ItemsSource="{Binding Types}"
+                SelectedItem="{Binding SelectedType}" />
+            <Button
+                Background="#FF4CAF50"
+                Command="{Binding AddVariableCommand}"
+                Content="添加变量"
+                Foreground="White" />
+            <Button
+                Background="#FF4CAF50"
+                Command="{Binding AddNewVariableCommand}"
+                Content="添加新变量"
+                Foreground="White" />
+            <Button
+                Background="#FF4CAF50"
+                Click="SerialSettingButton_Click"
+                Content="配置串口"
+                Foreground="White" />
+
+            <Button
+                Background="#FF1677FF"
+                Command="{Binding OpenOrCloseCom}"
+                Content="打开串口"
+                Style="{StaticResource MenuStyleBtn}"
+                Tag="&#xe622;"
+                Visibility="{Binding ComIconOpen}" />
+            <Button
+                Background="#FFF75231"
+                Command="{Binding OpenOrCloseCom}"
+                Content="关闭串口"
+                Style="{StaticResource MenuStyleBtn}"
+                Tag="&#xe691;"
+                Visibility="{Binding ComIconClose}" />
+        </StackPanel>
+
+        <!--  变量列表  -->
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <DataGrid
+                x:Name="VariablesGrid"
+                AutoGenerateColumns="False"
+                CanUserAddRows="False"
+                GridLinesVisibility="None"
+                HeadersVisibility="Column"
+                IsReadOnly="False"
+                ItemsSource="{Binding Variables}"
+                RowDetailsVisibilityMode="Collapsed"
+                SelectedItem="{Binding SelectedVariable}"
+                SelectionMode="Single">
+                <DataGrid.Columns>
+                    <!--  监控状态列  -->
+                    <DataGridTemplateColumn
+                        Width="60"
+                        Header="监控"
+                        IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    IsChecked="{Binding IsMonitored, Mode=TwoWay}"
+                                    IsEnabled="{Binding IsMonitored, Converter={StaticResource BoolInverter}}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!--  变量名称列  -->
+                    <DataGridTextColumn
+                        Width="*"
+                        Binding="{Binding Name}"
+                        Header="变量名称"
+                        IsReadOnly="True" />
+
+                    <!--  地址列  -->
+                    <DataGridTextColumn
+                        Width="100"
+                        Binding="{Binding Address}"
+                        Header="地址"
+                        IsReadOnly="True" />
+                    <!--  大小  -->
+                    <DataGridTextColumn
+                        Width="100"
+                        Binding="{Binding Size}"
+                        Header="大小"
+                        IsReadOnly="True" />
+                    <!--  类型  -->
+                    <DataGridTextColumn
+                        Width="100"
+                        Binding="{Binding Type}"
+                        Header="类型"
+                        IsReadOnly="True" />
+
+                    <!--  偏移量列（可编辑）  -->
+                    <DataGridTemplateColumn Width="80" Header="偏移量">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock HorizontalAlignment="Center" Text="{Binding Offset}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <TextBox
+                                    VerticalAlignment="Center"
+                                    HorizontalContentAlignment="Center"
+                                    Text="{Binding Offset, UpdateSourceTrigger=PropertyChanged}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!--  当前值列  -->
+                    <DataGridTextColumn
+                        Width="100"
+                        Binding="{Binding CurrentValue, StringFormat=F2}"
+                        Header="当前值" />
+
+                    <!--  操作列  -->
+                    <DataGridTemplateColumn Width="250" Header="操作">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button
+                                        Background="#FF2196F3"
+                                        Command="{Binding DataContext.ShowTrendCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        CommandParameter="{Binding}"
+                                        Content="趋势曲线"
+                                        Foreground="White"
+                                        Style="{StaticResource ActionButtonStyle}" />
+
+                                    <Button
+                                        Background="#FFFF9800"
+                                        Command="{Binding DataContext.ToggleMonitoringCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        CommandParameter="{Binding}"
+                                        Content="切换监控"
+                                        Foreground="White"
+                                        Style="{StaticResource ActionButtonStyle}" />
+
+                                    <Button
+                                        Background="#FFF44336"
+                                        Command="{Binding DataContext.DeleteVariableCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        CommandParameter="{Binding}"
+                                        Content="删除"
+                                        Foreground="White"
+                                        Style="{StaticResource ActionButtonStyle}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!--  底部状态栏  -->
+            <StatusBar Grid.Row="1">
+                <StatusBarItem>
+                    <TextBlock>
+                        <Run Text="已选择:" />
+                        <Run FontWeight="Bold" Text="{Binding SelectedVariable.Name, FallbackValue='无'}" />
+                        <Run Text="| 监控变量:" />
+                        <Run FontWeight="Bold" Text="{Binding VariableCount}" />
+                    </TextBlock>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal">
+                        <Border
+                            Width="20"
+                            Height="20"
+                            Margin="5,0"
+                            Background="{Binding ComStatus}"
+                            CornerRadius="10" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Text="串口状态" />
+                        <TextBlock
+                            Margin="5,0,0,0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Foreground="{Binding ComStatus}"
+                            Text="{Binding Status}"
+                            ToolTip="{Binding Status}" />
+                    </StackPanel>
+                </StatusBarItem>
+            </StatusBar>
+        </Grid>
+    </DockPanel>
+
+
+
+
+</Window>
