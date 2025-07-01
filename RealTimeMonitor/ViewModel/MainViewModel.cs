@@ -50,8 +50,25 @@ namespace RealTimeMonitor.ViewModel
         // 创建字典存储名称-地址映射
         Dictionary<string, string> addressMap = new Dictionary<string, string>();
 
-        // 创建字典存储名称-偏移地址映射
+        // 创建字典存储名称-偏移地址映射(大小)
         Dictionary<string, string> addressMoveMap = new Dictionary<string, string>();
+
+        // 添加多选支持
+        private ObservableCollection<VariableItem> _selectedVariables = new ObservableCollection<VariableItem>();
+        public ObservableCollection<VariableItem> SelectedVariables
+        {
+            get => _selectedVariables;
+            set
+            {
+                _selectedVariables = value;
+                OnPropertyChanged(nameof(SelectedVariables));
+                OnPropertyChanged(nameof(IsAnyVariableSelected));
+            }
+        }
+
+        public bool IsAnyVariableSelected => SelectedVariables.Count() > 0;
+
+        public ICommand ShowMultiTrendCommand { get; }
 
         /// <summary>
         /// 数据类型
@@ -436,9 +453,12 @@ namespace RealTimeMonitor.ViewModel
             GetVariableItems = new RelayCommand(GetVariableName);
             GetVariablePath = new RelayCommand(GetPathByName);
             OpenOrCloseCom = new RelayCommand(openCom);
+            // 初始化多趋势命令
+            ShowMultiTrendCommand = new RelayCommand(ShowMultiTrend,CanShowMultiTrend);
+            ShowDemoCoammand = new RelayCommand(ShowDemo);
 
 
-            // 启动定时更新
+            // 启动定时更新数据(随机生成数据)
             //_updateTimer = new Timer(1000);
             //_updateTimer.Elapsed += UpdateVariables;
             //_updateTimer.Start();
@@ -449,6 +469,36 @@ namespace RealTimeMonitor.ViewModel
         #endregion
 
         #region 监控变量处理方法
+
+        public ICommand ShowDemoCoammand { get; }
+
+        private void ShowDemo(object sender)
+        {
+            new Window1().Show();
+        }
+
+        private bool CanShowMultiTrend(object parameter) => IsVariableSelected;
+
+        /// <summary>
+        /// 显示多变量实时曲线
+        /// </summary>
+        /// <param name="parameter"></param>
+        private void ShowMultiTrend(object parameter)
+        {
+            if (SelectedVariables.Count == 0) return;
+            if (SelectedVariables.Count == 1)
+            {
+                ShowTrend(SelectedVariable);
+                return;
+            }
+            var MultiTrendWindow = new MultiTrendViewModel(SelectedVariables.ToList());
+            // 创建多变量趋势窗口
+            var trendWindow = new MultiTrendWindow
+            {
+                DataContext = MultiTrendWindow
+            };
+            trendWindow.Show();
+        }
 
         /// <summary>
         /// 添加新的控制变量
@@ -468,6 +518,7 @@ namespace RealTimeMonitor.ViewModel
                     Type = "int8U"
                 };
             }
+            
             var dialog = new AddVariableDialog
             {
 
@@ -555,9 +606,9 @@ namespace RealTimeMonitor.ViewModel
         /// <param name="parameter"></param>
         private void DeleteVariable(object parameter)
         {
-            if (SelectedVariable != null)
+            if (parameter is VariableItem item)
             {
-                RemoveVariable(SelectedVariable.Id);
+                RemoveVariable(item.Id);
             }
         }
 
@@ -608,28 +659,56 @@ namespace RealTimeMonitor.ViewModel
             //};
             //trendWindow.Show();
 
-            if (SelectedVariable!=null)
+            //if (SelectedVariable!=null)
+            //{
+            //    // 检查是否已经打开过该变量的趋势窗口
+            //    if (_openTrendWindows.TryGetValue(SelectedVariable.Id, out var existingWindow))
+            //    {
+            //        existingWindow.Activate();
+            //        return;
+            //    }
+
+            //    // 创建趋势窗口
+            //    var trendWindow = new NewTrendWindow
+            //    {
+            //        DataContext = SelectedVariable.TrendViewModel
+            //    };
+
+            //    // 监听窗口关闭事件
+            //    trendWindow.Closed += (s, e) =>
+            //    {
+            //        _openTrendWindows.Remove(SelectedVariable.Id);
+            //    };
+
+            //    _openTrendWindows[SelectedVariable.Id] = trendWindow;
+            //    trendWindow.Show();
+            //}
+            // 创建当前监控项的副本
+            
+            if (parameter is VariableItem item)
             {
                 // 检查是否已经打开过该变量的趋势窗口
-                if (_openTrendWindows.TryGetValue(SelectedVariable.Id, out var existingWindow))
+                if (_openTrendWindows.TryGetValue(item.Id, out var existingWindow))
                 {
                     existingWindow.Activate();
                     return;
                 }
 
+                
                 // 创建趋势窗口
                 var trendWindow = new NewTrendWindow
                 {
-                    DataContext = SelectedVariable.TrendViewModel
-                };
+                    DataContext = item.TrendViewModel
 
+                };
+                item.TrendViewModel.VariableName = item.Name;
                 // 监听窗口关闭事件
                 trendWindow.Closed += (s, e) =>
                 {
-                    _openTrendWindows.Remove(SelectedVariable.Id);
+                    _openTrendWindows.Remove(item.Id);
                 };
 
-                _openTrendWindows[SelectedVariable.Id] = trendWindow;
+                _openTrendWindows[item.Id] = trendWindow;
                 trendWindow.Show();
             }
         }
@@ -645,9 +724,9 @@ namespace RealTimeMonitor.ViewModel
 
             lock (_syncLock)
             {
-                if (SelectedVariable != null)
+                if (parameter is VariableItem item)
                 {
-                    Application.Current.Dispatcher.Invoke(() => SelectedVariable.IsMonitored = !SelectedVariable.IsMonitored);
+                    Application.Current.Dispatcher.Invoke(() => item.IsMonitored = !item.IsMonitored);
                 }
             }
         }
@@ -841,7 +920,7 @@ namespace RealTimeMonitor.ViewModel
                 ChangeComIcon(true);
                 comStateColor(true);
                 //AddLog($"打开串口{SerialCommunicationService.getComName()}成功");
-                MessageBox.Show("串口打开成功！");
+                //MessageBox.Show("串口打开成功！");
 
                 //开始通讯
                 StartBackgroundThread();

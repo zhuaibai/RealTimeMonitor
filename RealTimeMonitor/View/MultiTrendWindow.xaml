@@ -1,38 +1,38 @@
-﻿<Window x:Class="RealTimeMonitor.View.NewTrendWindow"
+﻿<Window x:Class="RealTimeMonitor.View.MultiTrendWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:convert="clr-namespace:RealTimeMonitor.ConvertTools"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:RealTimeMonitor.View"
+        xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
         mc:Ignorable="d"
-       Title="{Binding VariableName, StringFormat={}{0} - 实时趋势}" 
+        Closing="Window_Closing"
+         Title="多变量实时趋势" 
         Height="600" Width="1000"
-        Closing="Window_Closing">
+        >
     <Window.Resources>
         <!-- 暂停/继续文本转换器 -->
-        <local:BoolToPauseResumeConverter x:Key="PauseResumeConverter" />
+        <local:BoolToPauseResumeConverter x:Key="PauseResumeConverter"/>
+
         <!-- 速度到颜色转换器 -->
         <local:SpeedToColorConverter x:Key="SpeedColorConverter"/>
+
         <!-- 暂停状态到颜色转换器 -->
         <local:PauseToColorConverter x:Key="PauseToColorConverter"/>
+
+        <!-- 系列到变量ID转换器 -->
+        <local:SeriesToIdConverter x:Key="SeriesToIdConverter"/>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- 标题和控制栏 -->
         <StackPanel Orientation="Horizontal" Margin="10" HorizontalAlignment="Center">
-            <!-- 变量名称和状态 -->
-            <StackPanel Orientation="Vertical" Margin="0,0,20,0">
-                <TextBlock Text="{Binding VariableName}" FontSize="16" FontWeight="Bold"/>
-                <TextBlock Text="{Binding IsRunningIndicator}" 
-                           Foreground="{Binding IsPaused, Converter={StaticResource PauseToColorConverter}}"
-                           HorizontalAlignment="Center"/>
-            </StackPanel>
+            <TextBlock Text="多变量趋势" FontSize="16" FontWeight="Bold" Margin="0 0 20 0"/>
 
             <!-- 暂停/继续按钮 -->
             <Button Content="{Binding PauseResumeText}" 
@@ -89,22 +89,11 @@
                             Width="30" Margin="2" Padding="0"/>
                 </StackPanel>
             </StackPanel>
-
-            <!-- 状态信息 -->
-            <StackPanel Orientation="Vertical" Margin="10,0,0,0">
-                <TextBlock Text="统计信息" HorizontalAlignment="Center"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <TextBlock Text="帧率:" Margin="0,0,5,0"/>
-                    <TextBlock Text="{Binding FrameRate}" FontWeight="Bold" Margin="0,0,10,0"/>
-                    <TextBlock Text="点数:" Margin="0,0,5,0"/>
-                    <TextBlock Text="{Binding PointCount}" FontWeight="Bold"/>
-                </StackPanel>
-            </StackPanel>
         </StackPanel>
 
         <!-- 趋势图表 -->
         <lvc:CartesianChart Grid.Row="1" Series="{Binding SeriesCollection}" 
-                            LegendLocation="None" Margin="10"
+                            LegendLocation="Bottom" Margin="10"
                             DisableAnimations="True"
                             Hoverable="False"
                             DataTooltip="{x:Null}"
@@ -122,15 +111,53 @@
             </lvc:CartesianChart.AxisX>
         </lvc:CartesianChart>
 
+        <!-- 变量控制栏 -->
+        <!--<StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
+            <TextBlock Text="显示/隐藏变量:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+            <ItemsControl ItemsSource="{Binding SeriesCollection}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Content="{Binding Title}" 
+                                Command="{Binding DataContext.ToggleVisibilityCommand, 
+                                         RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding Tag}"
+                                Margin="5,0,0,0"
+                                Background="{Binding Stroke}"
+                                Foreground="White"
+                                ToolTip="点击切换显示/隐藏此变量"
+                                Padding="5,2"
+                                MinWidth="100">
+                            <Button.Tag>
+                                <MultiBinding Converter="{StaticResource SeriesToIdConverter}">
+                                    <Binding Path="."/>
+                                    <Binding Path="DataContext" 
+                                             RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                </MultiBinding>
+                            </Button.Tag>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>-->
+
         <!-- 调试信息 -->
         <Border Grid.Row="1" 
                 HorizontalAlignment="Left" VerticalAlignment="Bottom"
                 Margin="10" Background="#CCFFFFFF" CornerRadius="5"
                 Padding="5">
-            <TextBlock Text="{Binding DebugInfo}" 
-                       Foreground="#333333" FontFamily="Consolas" FontSize="12"/>
+            <StackPanel>
+                <TextBlock Text="{Binding IsRunningIndicator}" 
+                           Foreground="{Binding IsPaused, Converter={StaticResource PauseToColorConverter}}"
+                           FontWeight="Bold" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding DebugInfo}" 
+                           Foreground="#333333" FontFamily="Consolas" FontSize="12"/>
+            </StackPanel>
         </Border>
     </Grid>
-
-
 </Window>

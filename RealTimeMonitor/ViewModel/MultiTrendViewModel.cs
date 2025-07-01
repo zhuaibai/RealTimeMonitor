@@ -1,63 +1,39 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using LiveCharts.Configurations;
 using LiveCharts.Wpf;
 using LiveCharts;
+using RealTimeMonitor.ViewModel;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.Windows;
-using System.Windows.Input;
-using System.Collections.ObjectModel;
-using RealTimeMonitor.View;
 
-namespace RealTimeMonitor.ViewModel
+namespace RealTimeMonitor.View
 {
-    public class NewTrendViewModel : INotifyPropertyChanged
+    public class MultiTrendViewModel : INotifyPropertyChanged
     {
-        private readonly DispatcherTimer _dataTimer;
         private readonly DispatcherTimer _scrollTimer;
-        private readonly ConcurrentQueue<DataPoint> _dataQueue = new ConcurrentQueue<DataPoint>();
         private DateTime _startTime;
         private double _xAxisMin;
         private double _xAxisMax;
         private double _targetXAxisMin;
         private double _targetXAxisMax;
-        private bool _isPaused;
-        private double _timeRange = 20.0; // 默认20秒
         private double _smoothFactor = 0.2;
         private double _scrollSpeed = 1.0;
         private int _frameCount;
         private DateTime _lastFrameTime = DateTime.Now;
-        private int _pointCount;
+        private bool _isPaused;
+        private double _timeRange = 20.0;
 
-        private string variableName;
+        // 存储变量与系列的映射关系
+        public Dictionary<Guid, LineSeries> _variableSeriesMap = new Dictionary<Guid, LineSeries>();
 
-        public string VariableName {
-            get
-            {
-                return variableName;
-            }
-            set
-            {
-                variableName = value;
-                OnPropertyChanged(nameof(VariableName));
-            }}
-        public SeriesCollection SeriesCollection { get; }
-       
-
-        public Func<double, string> YFormatter { get; } = value => value.ToString("F2");
-
-        // 时间格式化器 - 显示秒和毫秒
-        public Func<double, string> DateTimeFormatter => value =>
-        {
-            var time = TimeSpan.FromMilliseconds(value);
-            return $"{time.Seconds}.{time.Milliseconds:D3}s";
-        };
+        public SeriesCollection SeriesCollection { get; } = new SeriesCollection();
+        
 
         public double XAxisMin
         {
@@ -90,7 +66,6 @@ namespace RealTimeMonitor.ViewModel
             get => _timeRange;
             set
             {
-                // 限制在20-60秒范围内
                
                 if (Math.Abs(_timeRange - value) > 0.1)
                 {
@@ -129,14 +104,13 @@ namespace RealTimeMonitor.ViewModel
                     OnPropertyChanged(nameof(IsPaused));
                     OnPropertyChanged(nameof(IsRunningIndicator));
                     OnPropertyChanged(nameof(PauseResumeText));
+
                     if (_isPaused)
                     {
-                        _dataTimer.Stop();
                         _scrollTimer.Stop();
                     }
                     else
                     {
-                        _dataTimer.Start();
                         _scrollTimer.Start();
                     }
                 }
@@ -146,15 +120,11 @@ namespace RealTimeMonitor.ViewModel
         public string IsRunningIndicator => IsPaused ? "已暂停" : "运行中";
         public string PauseResumeText => IsPaused ? "继续监控" : "暂停监控";
 
-        public int MaxPoints { get; set; } = 200;
-
         public int FrameRate { get; private set; }
-        public int PointCount => _pointCount;
 
         public string DebugInfo => $"{DateTime.Now:HH:mm:ss.fff}\n" +
-                                  $"帧率: {FrameRate} FPS | 点数: {PointCount}\n" +
+                                  $"帧率: {FrameRate} FPS\n" +
                                   $"范围: {TimeRange:F0}s | 速度: {_scrollSpeed:F1}x";
-
 
         // 命令定义
         public ICommand TogglePauseCommand { get; }
@@ -162,38 +132,49 @@ namespace RealTimeMonitor.ViewModel
         public ICommand IncreaseSpeedCommand { get; }
         public ICommand DecreaseSpeedCommand { get; }
         public ICommand ResetSpeedCommand { get; }
+        public ICommand ToggleVisibilityCommand { get; }
 
-        public NewTrendViewModel(string variableName)
+        public MultiTrendViewModel(List<VariableItem> variables)
         {
-            VariableName = variableName;
             _startTime = DateTime.Now;
+            _lastFrameTime = DateTime.Now;
 
-            // 配置图表映射器
-            var mapper = Mappers.Xy<DataPoint>()
-                .X(point => point.TimeOffset) // 使用时间偏移量
-                .Y(point => point.Value);
-
-            Charting.For<DataPoint>(mapper);
-
-            // 初始化折线系列
-            var lineSeries = new LineSeries
+            // 为每个变量创建系列
+            int colorIndex = 0;
+            var colors = new Color[]
             {
-                Title = variableName,
-                Values = new ChartValues<DataPoint>(),
-                PointGeometry = null,
-                Stroke = Brushes.DodgerBlue,
-                StrokeThickness = 2,
-                Fill = Brushes.Transparent
+                Colors.DodgerBlue,
+                Colors.Orange,
+                Colors.Green,
+                Colors.Red,
+                Colors.Purple,
+                Colors.Brown,
+                Colors.Teal,
+                Colors.Magenta,
+                Colors.Gold,
+                Colors.DeepSkyBlue
             };
 
-            SeriesCollection = new SeriesCollection { lineSeries };
-
-            // 初始化数据更新定时器
-            _dataTimer = new DispatcherTimer
+            foreach (var variable in variables)
             {
-                Interval = TimeSpan.FromMilliseconds(50) // 20fps
-            };
-            _dataTimer.Tick += ProcessDataQueue;
+                var lineSeries = new LineSeries
+                {
+                    Title = variable.Name,
+                    Values = new ChartValues<DataPoint>(),
+                    PointGeometry = null,
+                    Stroke = new SolidColorBrush(colors[colorIndex % colors.Length]),
+                    StrokeThickness = 2,
+                    Fill = Brushes.Transparent
+                };
+
+                SeriesCollection.Add(lineSeries);
+                _variableSeriesMap[variable.Id] = lineSeries;
+
+                // 订阅变量更新事件
+                variable.PropertyChanged += Variable_PropertyChanged;
+
+                colorIndex++;
+            }
 
             // 初始化滚动定时器
             _scrollTimer = new DispatcherTimer
@@ -211,46 +192,50 @@ namespace RealTimeMonitor.ViewModel
             IncreaseSpeedCommand = new RelayCommand(IncreaseSpeed);
             DecreaseSpeedCommand = new RelayCommand(DecreaseSpeed);
             ResetSpeedCommand = new RelayCommand(ResetSpeed);
-
+            ToggleVisibilityCommand = new RelayCommand(ToggleVisibility);
 
             // 启动定时器
-            _dataTimer.Start();
             _scrollTimer.Start();
         }
 
-        // 添加数据点（线程安全）
-        public void AddDataPoint(double value)
+        public Func<double, string> YFormatter { get; } = value => value.ToString("F2");
+
+        // 时间格式化器
+        public Func<double, string> DateTimeFormatter => value =>
         {
+            var time = TimeSpan.FromMilliseconds(value);
+            return $"{time.Seconds}.{time.Milliseconds:D3}s";
+        };
+
+        // 处理变量值更新
+        private void Variable_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(VariableItem.CurrentValue)) return;
+            if (sender is not VariableItem variable) return;
+
             var now = DateTime.Now;
             var timeOffset = (now - _startTime).TotalMilliseconds;
 
-            _dataQueue.Enqueue(new DataPoint
+            if (_variableSeriesMap.TryGetValue(variable.Id, out var series))
             {
-                TimeOffset = timeOffset,
-                Value = value
-            });
-        }
-
-        // 处理数据队列
-        private void ProcessDataQueue(object sender, EventArgs e)
-        {
-            if (IsPaused) return;
-
-            // 处理队列中的所有数据点
-            while (_dataQueue.TryDequeue(out var dataPoint))
-            {
-                SeriesCollection[0].Values.Add(dataPoint);
-
-                // 限制数据点数量
-                if (SeriesCollection[0].Values.Count > MaxPoints * 1.2)
+                var dataPoint = new DataPoint
                 {
-                    SeriesCollection[0].Values.RemoveAt(0);
-                }
-            }
+                    TimeOffset = timeOffset,
+                    Value = variable.CurrentValue
+                };
 
-            // 更新点数统计
-            _pointCount = SeriesCollection[0].Values.Count;
-            OnPropertyChanged(nameof(PointCount));
+                // 在UI线程添加数据点
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    series.Values.Add(dataPoint);
+
+                    // 限制数据点数量
+                    if (series.Values.Count > 200 * 1.2)
+                    {
+                        series.Values.RemoveAt(0);
+                    }
+                });
+            }
         }
 
         // 平滑滚动时间轴
@@ -285,7 +270,6 @@ namespace RealTimeMonitor.ViewModel
             var now = DateTime.Now;
             var currentTime = (now - _startTime).TotalMilliseconds;
 
-            // 计算目标范围（考虑滚动速度）
             _targetXAxisMin = currentTime - TimeRange * 1000 * _scrollSpeed;
             _targetXAxisMax = currentTime;
         }
@@ -303,21 +287,20 @@ namespace RealTimeMonitor.ViewModel
             _targetXAxisMax = XAxisMax;
         }
 
-        // 暂停
+        // 命令执行方法
         private void TogglePause(object parameter)
         {
             IsPaused = !IsPaused;
         }
 
-        // 清空数据
         private void ClearData(object parameter)
         {
-            SeriesCollection[0].Values.Clear();
-            while (_dataQueue.TryDequeue(out _)) { }
+            foreach (var series in SeriesCollection)
+            {
+                series.Values.Clear();
+            }
             _startTime = DateTime.Now;
             ResetTimeRange();
-            _pointCount = 0;
-            OnPropertyChanged(nameof(PointCount));
             OnPropertyChanged(nameof(DebugInfo));
         }
 
@@ -335,9 +318,19 @@ namespace RealTimeMonitor.ViewModel
         {
             ScrollSpeed = 1.0;
         }
+
+        private void ToggleVisibility(object parameter)
+        {
+            if (parameter is Guid variableId && _variableSeriesMap.TryGetValue(variableId, out var series))
+            {
+                series.Visibility = series.Visibility == Visibility.Visible
+                    ? Visibility.Hidden
+                    : Visibility.Visible;
+            }
+        }
+
         public void Cleanup()
         {
-            _dataTimer.Stop();
             _scrollTimer.Stop();
         }
 
@@ -346,13 +339,5 @@ namespace RealTimeMonitor.ViewModel
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
-    }
-    /// <summary>
-    /// 数据点模型
-    /// </summary>
-    public class DataPoint
-    {
-        public double TimeOffset { get; set; } // 毫秒为单位
-        public double Value { get; set; }
     }
 }

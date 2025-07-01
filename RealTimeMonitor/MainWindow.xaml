@@ -4,10 +4,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="clr-namespace:RealTimeMonitor"
+    xmlns:DataGridHelper="clr-namespace:RealTimeMonitor.ConvertTools"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="[vm ]clr-namespace:RealTimeMonitor.ViewModel"
     Title="MainWindow"
-    Width="1100"
+    Width="1200"
     Height="550"
     Closing="Window_Closing"
     WindowStartupLocation="CenterScreen"
@@ -86,6 +87,10 @@
                 Command="{Binding AddNewVariableCommand}"
                 Content="添加新变量"
                 Foreground="White" />
+            <Button Content="多变量趋势" Command="{Binding ShowMultiTrendCommand}" 
+                    ToolTip="在同一个图表中查看多个变量"
+                    Background="#FF9C27B0" Foreground="White"
+                    />
             <Button
                 Background="#FF4CAF50"
                 Click="SerialSettingButton_Click"
@@ -106,6 +111,7 @@
                 Style="{StaticResource MenuStyleBtn}"
                 Tag="&#xe691;"
                 Visibility="{Binding ComIconClose}" />
+            
         </StackPanel>
 
         <!--  变量列表  -->
@@ -122,11 +128,23 @@
                 GridLinesVisibility="None"
                 HeadersVisibility="Column"
                 IsReadOnly="False"
+                DataGridHelper:DataGridHelper.SelectedItemsBinding="{Binding SelectedVariables}"
+                SelectionMode="Extended"
                 ItemsSource="{Binding Variables}"
                 RowDetailsVisibilityMode="Collapsed"
-                SelectedItem="{Binding SelectedVariable}"
-                SelectionMode="Single">
+                SelectedItem="{Binding SelectedVariable}" 
+                >
                 <DataGrid.Columns>
+                    <!-- 选择列 -->
+                    <DataGridTemplateColumn Width="40">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}, Mode=TwoWay}"
+                                          IsEnabled="False"
+                                          HorizontalAlignment="Center"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <!--  监控状态列  -->
                     <DataGridTemplateColumn
                         Width="60"
