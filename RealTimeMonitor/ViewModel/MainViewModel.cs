@@ -69,7 +69,7 @@ namespace RealTimeMonitor.ViewModel
 
         public bool IsAnyVariableSelected => SelectedVariables.Count() > 0;
 
-        public ICommand ShowMultiTrendCommand { get; }
+       
 
         /// <summary>
         /// 数据类型
@@ -163,10 +163,11 @@ namespace RealTimeMonitor.ViewModel
         public ICommand DeleteVariableCommand { get; }
         public ICommand ShowTrendCommand { get; }
         public ICommand ToggleMonitoringCommand { get; }
-
         public ICommand GetVariableItems { get; }
         public ICommand GetVariablePath { get; }
         public ICommand OpenOrCloseCom { get; }
+        public ICommand ShowMultiTrendCommand { get; }
+        public ICommand ShowRealMultiTrendCommand { get; }
 
         #endregion
 
@@ -456,6 +457,7 @@ namespace RealTimeMonitor.ViewModel
             OpenOrCloseCom = new RelayCommand(openCom);
             // 初始化多趋势命令
             ShowMultiTrendCommand = new RelayCommand(ShowMultiTrend,CanShowMultiTrend);
+            ShowRealMultiTrendCommand = new RelayCommand(ShowRealMultiTrend,CanShowMultiTrend);
             ShowDemoCoammand = new RelayCommand(ShowDemo);
 
 
@@ -514,15 +516,34 @@ namespace RealTimeMonitor.ViewModel
                 ShowTrend(SelectedVariable);
                 return;
             }
-            var RealMultiTrendWindow = new RealTimeMultiTrendViewModel(SelectedVariables.ToList());
+            var RealMultiTrendViewModel = new RealTimeMultiTrendViewModel(SelectedVariables.ToList());
             // 创建多变量趋势窗口
             var trendWindow = new MultiTrendWindow
             {
-                DataContext = RealMultiTrendWindow.MultiTrendViewModel
+                DataContext = RealMultiTrendViewModel.MultiTrendViewModel
             };
             //添加到字典
-            _realVariablesDict[RealMultiTrendWindow.Id]= RealMultiTrendWindow;
+            _realVariablesDict[RealMultiTrendViewModel.Id]= RealMultiTrendViewModel;
+            //窗口关闭时移除相应的字典对象
+            trendWindow.Closing += TrendWindow_Closing;
             trendWindow.Show();
+        }
+
+        /// <summary>
+        /// 移除相应的实时多变量监控
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void TrendWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            if (sender is MultiTrendWindow view)
+            {
+                if (view.DataContext is MultiTrendViewModel multiTrendViewModel)
+                {
+                    RemoveRealMultiVariable(multiTrendViewModel.Id);
+                }
+            }
+            
         }
 
         /// <summary>
@@ -659,6 +680,22 @@ namespace RealTimeMonitor.ViewModel
                     }
 
                     Application.Current.Dispatcher.Invoke(() => Variables.Remove(item));
+                }
+            }
+        }
+
+        /// <summary>
+        /// 移除实时监控变量
+        /// </summary>
+        /// <param name="id"></param>
+        public void RemoveRealMultiVariable(Guid id)
+        {
+            lock (_syncLock)
+            {
+                if (_realVariablesDict.TryRemove(id, out var item))
+                {
+                    // 清理资源
+                    item.MultiTrendViewModel.Cleanup();
                 }
             }
         }
@@ -1166,6 +1203,28 @@ namespace RealTimeMonitor.ViewModel
 
 
 
+                    }
+
+                    //创建需要多变量实时监控的副本
+                    List<RealTimeMultiTrendViewModel> realTimeMultiTrendViewModels;
+                    lock (_syncLock)
+                    {
+                        realTimeMultiTrendViewModels = _realVariablesDict.Values.ToList();
+                    }
+                    foreach (RealTimeMultiTrendViewModel item in realTimeMultiTrendViewModels)
+                    {
+                        if (token.IsCancellationRequested) break;
+                        try
+                        {
+                            //发送指令
+                            receive = SerialCommunicationService.SendPathCommand($"TQFDEBUG{item.GetSendCommand}", item.returnCount);
+                            //解析返回
+                            item.AnalyzeReceiveData(receive);
+                        }
+                        catch(Exception ex) 
+                        {
+                                break;
+                        }
                     }
                     // 模拟常规通信
                     await Task.Delay(50, token);

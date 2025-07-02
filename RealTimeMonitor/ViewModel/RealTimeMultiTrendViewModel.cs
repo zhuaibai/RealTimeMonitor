@@ -16,7 +16,9 @@ namespace RealTimeMonitor.ViewModel
         public Guid Id { get; } = Guid.NewGuid();
 
         //发送指令地址
-        private string address ="";
+        public string address ="";
+
+        public int returnCount =0;
 
         //监控变量集合 
         private List<VariableItem> items = new List<VariableItem>();
@@ -46,11 +48,18 @@ namespace RealTimeMonitor.ViewModel
                 int count = HesWithSeperateToInt(itemViewModel.Address) + (int)ParseDecimalString(itemViewModel.Offset);
                 //拼接地址 (地址 + 类型)
                 address = address + GetPathFromHes(IntToHexWithSeparator(count)) + GetType(itemViewModel.Type);
+                //计算返回值
+                returnCount += GetNumformType(itemViewModel.Type);
             }
-
+            //加上返回的空格
+            returnCount += variables.Count - 1;
             //根据新的变量来创建ViewModel
             MultiTrendViewModel = new MultiTrendViewModel(items);
+            //设定ID
+            MultiTrendViewModel.Id = Id;
         }
+
+
 
         /// <summary>
         /// 解析收到的数据
@@ -111,6 +120,30 @@ namespace RealTimeMonitor.ViewModel
             return address;
         }
 
+        /// <summary>
+        /// 获取相应类型的返回值
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public int GetNumformType(string type)
+        {
+            if (!string.IsNullOrEmpty(type))
+            {
+                if (type == "int8U" || type == "int8S")
+                {
+                    return 3;
+                }
+                else if (type == "int16U" || type == "int16S")
+                {
+                    return 5;
+                }
+                else return 10;
+            }
+            else
+            {
+                return 0;
+            }
+        }
 
         /// <summary>
         /// 获取相应类型的指令值

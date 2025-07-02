@@ -87,7 +87,11 @@
                 Command="{Binding AddNewVariableCommand}"
                 Content="添加新变量"
                 Foreground="White" />
-            <Button Content="多变量趋势" Command="{Binding ShowMultiTrendCommand}" 
+            <Button Content="多变量趋势(轮询)" Command="{Binding ShowMultiTrendCommand}" 
+                    ToolTip="在同一个图表中查看多个变量"
+                    Background="#FF9C27B0" Foreground="White"
+                    />
+            <Button Content="多变量趋势(实时)" Command="{Binding ShowRealMultiTrendCommand}" 
                     ToolTip="在同一个图表中查看多个变量"
                     Background="#FF9C27B0" Foreground="White"
                     />

@@ -28,6 +28,7 @@ namespace RealTimeMonitor.View
         private DateTime _lastFrameTime = DateTime.Now;
         private bool _isPaused;
         private double _timeRange = 20.0;
+        public Guid Id;
 
         // 存储变量与系列的映射关系
         public Dictionary<Guid, LineSeries> _variableSeriesMap = new Dictionary<Guid, LineSeries>();
