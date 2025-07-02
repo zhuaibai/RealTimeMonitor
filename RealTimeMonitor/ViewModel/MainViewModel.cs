@@ -30,6 +30,7 @@ namespace RealTimeMonitor.ViewModel
 
         // 使用线程安全的集合
         private readonly ConcurrentDictionary<Guid, VariableItem> _variablesDict = new();
+        private readonly ConcurrentDictionary<Guid, RealTimeMultiTrendViewModel> _realVariablesDict = new();
         private readonly DataService _dataService = new DataService();
         private Timer _updateTimer;
         private VariableItem _selectedVariable;
@@ -480,7 +481,7 @@ namespace RealTimeMonitor.ViewModel
         private bool CanShowMultiTrend(object parameter) => IsVariableSelected;
 
         /// <summary>
-        /// 显示多变量实时曲线
+        /// 显示多变量实时曲线(轮询)
         /// </summary>
         /// <param name="parameter"></param>
         private void ShowMultiTrend(object parameter)
@@ -497,6 +498,30 @@ namespace RealTimeMonitor.ViewModel
             {
                 DataContext = MultiTrendWindow
             };
+            trendWindow.Show();
+        }
+
+
+        // <summary>
+        /// 显示多变量实时曲线(实时)
+        /// </summary>
+        /// <param name="parameter"></param>
+        private void ShowRealMultiTrend(object parameter)
+        {
+            if (SelectedVariables.Count == 0) return;
+            if (SelectedVariables.Count == 1)
+            {
+                ShowTrend(SelectedVariable);
+                return;
+            }
+            var RealMultiTrendWindow = new RealTimeMultiTrendViewModel(SelectedVariables.ToList());
+            // 创建多变量趋势窗口
+            var trendWindow = new MultiTrendWindow
+            {
+                DataContext = RealMultiTrendWindow.MultiTrendViewModel
+            };
+            //添加到字典
+            _realVariablesDict[RealMultiTrendWindow.Id]= RealMultiTrendWindow;
             trendWindow.Show();
         }
 
@@ -596,7 +621,7 @@ namespace RealTimeMonitor.ViewModel
             }
             else
             {
-
+                //没找到该变量
             }
         }
 
